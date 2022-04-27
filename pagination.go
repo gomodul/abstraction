@@ -3,6 +3,7 @@ package abstraction
 import (
 	"fmt"
 	"reflect"
+	"sync"
 )
 
 // Pagination ...
@@ -11,6 +12,7 @@ type Pagination struct {
 	PageSize *int    `json:"page_size"`
 	OrderBy  *string `json:"order_by"`
 	Order    *string `json:"order"`
+	once     sync.Once
 }
 
 // NewPagination ...
@@ -30,39 +32,41 @@ func NewPagination() *Pagination {
 
 // Init ...
 func (p *Pagination) Init() {
-	page := 1
-	if p.Page != nil {
-		page = *p.Page
-	}
+	p.once.Do(func() {
+		page := 1
+		if p.Page != nil {
+			page = *p.Page
+		}
 
-	pageSize := 0
-	if p.PageSize != nil {
-		pageSize = *p.PageSize
-	}
+		pageSize := 0
+		if p.PageSize != nil {
+			pageSize = *p.PageSize
+		}
 
-	switch {
-	case pageSize > 100:
-		pageSize = 100
-	case pageSize <= 0:
-		pageSize = 10
-	}
+		switch {
+		case pageSize > 100:
+			pageSize = 100
+		case pageSize <= 0:
+			pageSize = 10
+		}
 
-	p.Page = &page
-	p.PageSize = &pageSize
+		p.Page = &page
+		p.PageSize = &pageSize
+	})
 }
 
 // GetOffset ...
-func (p Pagination) GetOffset() int {
+func (p *Pagination) GetOffset() int {
 	return (*p.Page - 1) * *p.PageSize
 }
 
 // GetLimit ...
-func (p Pagination) GetLimit() int {
+func (p *Pagination) GetLimit() int {
 	return *p.PageSize + 1
 }
 
 // GetOrderBy ...
-func (p Pagination) GetOrderBy() string {
+func (p *Pagination) GetOrderBy() string {
 	orderBy := "id"
 	if p.OrderBy != nil {
 		orderBy = *p.OrderBy
@@ -77,14 +81,14 @@ func (p Pagination) GetOrderBy() string {
 }
 
 // NewPaginationInfo ...
-func (p Pagination) NewPaginationInfo(data interface{}) (interface{}, *PaginationInfo) {
+func (p *Pagination) NewPaginationInfo(data interface{}) (interface{}, *PaginationInfo) {
 	v := reflect.ValueOf(data)
 	if v.Kind() != reflect.Slice {
 		return data, nil
 	}
 
 	info := &PaginationInfo{
-		Pagination: &p,
+		Pagination: p,
 		More:       false,
 	}
 
